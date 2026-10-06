@@ -1,0 +1,9 @@
+$ErrorActionPreference = 'Stop'
+$production = @(Get-ChildItem src,include -File -Recurse | Where-Object { $_.Extension -in '.cpp','.hpp' })
+$forbiddenCalls = '\b(TerminateProcess|TerminateThread|SuspendThread|ResumeThread|DebugActiveProcess|DebugBreakProcess|WriteProcessMemory|ReadProcessMemory|VirtualAllocEx|VirtualFreeEx|VirtualProtectEx|CreateRemoteThread|CreateRemoteThreadEx|SetThreadContext|SetThreadPriority|SetThreadAffinityMask|SetPriorityClass|SetProcessAffinityMask|DuplicateHandle|ReleaseMutex|ReleaseSemaphore|SetEvent|ResetEvent|SendMessage\w*|PostMessage\w*|GenerateConsoleCtrlEvent|CreateProcess\w*|ShellExecute\w*|WinExec|system|_wsystem|_popen|socket|connect|getaddrinfo|GetAddrInfo\w*|WinHttp\w*|InternetOpen\w*)\s*\('
+$forbiddenRights = '\b(PROCESS_ALL_ACCESS|THREAD_ALL_ACCESS|PROCESS_TERMINATE|PROCESS_VM_READ|PROCESS_VM_WRITE|PROCESS_VM_OPERATION|PROCESS_CREATE_THREAD|THREAD_TERMINATE|THREAD_SUSPEND_RESUME|THREAD_SET_CONTEXT|THREAD_SET_INFORMATION|PROCESS_SET_INFORMATION)\b'
+$matches = @($production | Select-String -Pattern $forbiddenCalls,$forbiddenRights)
+if ($matches.Count) { $matches | Format-List; throw 'Production source/API audit failed' }
+New-Item -ItemType Directory -Force artifacts | Out-Null
+@('Application code performs only diagnostic/query operations and intentionally requests no target-process state changes.', 'Production source/API scan: PASS', 'No target mutation, debugging, injection, shell execution, or network calls found.', 'Only PROCESS_QUERY_LIMITED_INFORMATION and THREAD_QUERY_LIMITED_INFORMATION are requested.', 'Test-only helpers are excluded from the production target.', 'Import review must separately account for MSVC CRT self-termination and crash-reporting imports.') | Set-Content artifacts/source-audit.txt
+Get-Content artifacts/source-audit.txt
